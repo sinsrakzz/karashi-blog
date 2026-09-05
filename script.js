@@ -3,7 +3,7 @@
 const profile = {
   handle: "karashi",
   role: "security researcher",
-  focus: ["memory forensics"],
+  focus: ["memory forensics", "binary exploitation"],
   based_in: "Jakarta, ID",
   status: "available for CTF collabs",
   bio:
